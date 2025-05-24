@@ -1,11 +1,11 @@
-# DataScience Group K - Machine Learning Model Training and Evaluation Pipeline
+# DataScience Group K's Machine Learning Model Training and Evaluation Pipeline
 
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://python.org)
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-1.6.1%2B-orange.svg)](https://scikit-learn.org)
 [![pandas](https://img.shields.io/badge/pandas-2.2.3%2B-green.svg)](https://pandas.pydata.org)
 [![Optuna](https://img.shields.io/badge/optuna-4.3.0%2B-purple.svg)](https://optuna.org)
 
-**DataScience Group K** is a comprehensive model training and evaluation pipeline that utilizes various machine learning algorithms and hyperparameter optimization techniques. It supports various classification algorithms from scikit-learn and Bayesian optimization using Optuna.
+This project is a comprehensive model training and evaluation pipeline that utilizes various machine learning algorithms and hyperparameter optimization techniques. It supports various classification algorithms from scikit-learn and Bayesian optimization using Optuna.
 
 ## Table of Contents
 
