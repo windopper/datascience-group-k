@@ -5,6 +5,11 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.model_selection import GridSearchCV
 import numpy as np
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+
+console = Console()
 
 
 def get_parameter_grids():
@@ -181,11 +186,20 @@ def print_grid_search_summary(grid_search_results):
         Results dictionary from get_grid_search_results()
     """
 
-    print(f"\n[{grid_search_results['model_name']}] Grid Search Results:")
-    print(
-        f"  Best CV Score ({grid_search_results['scoring']}): {grid_search_results['best_score']:.4f}")
-    print(f"  Best Parameters: {grid_search_results['best_params']}")
-    print(f"  Number of CV folds: {grid_search_results['n_splits']}")
+    # Create panel for grid search results
+    panel = Panel.fit(
+        f"[bold white][{grid_search_results['model_name']}] Grid Search Results[/bold white]",
+        style="bold blue"
+    )
+    console.print(panel)
+
+    # Basic results
+    console.print(
+        f"  [bold]Best CV Score ({grid_search_results['scoring']}):[/bold] [bold green]{grid_search_results['best_score']:.4f}[/bold green]")
+    console.print(
+        f"  [bold]Best Parameters:[/bold] [yellow]{grid_search_results['best_params']}[/yellow]")
+    console.print(
+        f"  [bold]Number of CV folds:[/bold] {grid_search_results['n_splits']}")
 
     # Show top 5 parameter combinations
     cv_results = grid_search_results['cv_results']
@@ -193,9 +207,32 @@ def print_grid_search_summary(grid_search_results):
     # Get indices sorted by mean test score
     sorted_indices = np.argsort(cv_results['mean_test_score'])[::-1]
 
-    print(f"  Top 5 parameter combinations:")
+    console.print(
+        f"\n  [bold yellow]Top 5 parameter combinations:[/bold yellow]")
+
+    # Create table for top combinations
+    top_table = Table(show_header=True,
+                      header_style="bold magenta", box=None, padding=(0, 1))
+    top_table.add_column("Rank", style="cyan", width=4)
+    top_table.add_column("Score", style="bold green", justify="right")
+    top_table.add_column("Std", style="dim", justify="right")
+    top_table.add_column("Parameters", style="white")
+
     for i, idx in enumerate(sorted_indices[:5]):
         score = cv_results['mean_test_score'][idx]
         std = cv_results['std_test_score'][idx]
         params = cv_results['params'][idx]
-        print(f"    {i+1}. Score: {score:.4f} (±{std:.4f}) - {params}")
+
+        # Format parameters string
+        params_str = str(params)
+        if len(params_str) > 60:
+            params_str = params_str[:57] + "..."
+
+        top_table.add_row(
+            str(i+1),
+            f"{score:.4f}",
+            f"±{std:.4f}",
+            params_str
+        )
+
+    console.print(top_table)

@@ -3,6 +3,13 @@ from sklearn.metrics import (
     roc_auc_score, confusion_matrix, classification_report
 )
 import numpy as np
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+from rich.text import Text
+from rich import print as rprint
+
+console = Console()
 
 
 def evaluate_model_comprehensive(model, test_X, test_y, train_X, train_y, model_name, param_info):
@@ -61,37 +68,66 @@ def print_evaluation_summary(all_results, preprocessing_info=None):
     Print comprehensive evaluation summary including preprocessing information.
     """
     # Summary of all results
-    print("\n" + "=" * 80)
-    print("Overall Results Summary (Top 5 F1-Score)")
-    print("=" * 80)
+    console.print()
+    panel = Panel.fit(
+        "[bold white]Overall Results Summary (Top 5 F1-Score)[/bold white]",
+        style="bold blue"
+    )
+    console.print(panel)
 
     # Sort by F1-Score
     sorted_results = sorted(
         all_results, key=lambda x: x['f1_score'], reverse=True)
 
-    for i, result in enumerate(sorted_results[:5], 1):
-        print(f"{i}. {result['model_name']}")
-        print(f"   Parameters: {result['parameters']}")
-        print(f"   Accuracy: {result['accuracy']:.4f}, "
-              f"Precision: {result['precision']:.4f}, "
-              f"Recall: {result['recall']:.4f}, "
-              f"F1: {result['f1_score']:.4f}")
-        if result['roc_auc'] is not None:
-            print(f"   ROC-AUC: {result['roc_auc']:.4f}")
+    # Create table for top 5 results
+    results_table = Table(show_header=True, header_style="bold magenta")
+    results_table.add_column("Rank", style="cyan", width=4)
+    results_table.add_column("Model", style="yellow")
+    results_table.add_column("Parameters", style="white")
+    results_table.add_column("Accuracy", style="green", justify="right")
+    results_table.add_column("Precision", style="green", justify="right")
+    results_table.add_column("Recall", style="green", justify="right")
+    results_table.add_column("F1", style="bold green", justify="right")
+    results_table.add_column("ROC-AUC", style="green", justify="right")
+    results_table.add_column("Additional Info", style="dim")
 
-        # If optimization results, display additional information
+    for i, result in enumerate(sorted_results[:5], 1):
+        # Format parameters
+        params_str = str(result['parameters'])
+        if len(params_str) > 50:
+            params_str = params_str[:47] + "..."
+
+        # ROC-AUC handling
+        roc_auc_str = f"{result['roc_auc']:.4f}" if result['roc_auc'] is not None else "N/A"
+
+        # Additional info
+        additional_info = ""
         if 'optuna_cv_score' in result:
-            print(
-                f"   Optuna CV F1: {result['optuna_cv_score']:.4f} ({result['optuna_n_trials']} trials)")
+            additional_info = f"Optuna CV: {result['optuna_cv_score']:.4f} ({result['optuna_n_trials']} trials)"
         elif 'grid_search_cv_score' in result:
-            print(
-                f"   GridSearch CV F1: {result['grid_search_cv_score']:.4f} ({result['grid_search_type']} grid)")
-        print()
+            additional_info = f"GridSearch CV: {result['grid_search_cv_score']:.4f} ({result['grid_search_type']} grid)"
+
+        results_table.add_row(
+            str(i),
+            result['model_name'],
+            params_str,
+            f"{result['accuracy']:.4f}",
+            f"{result['precision']:.4f}",
+            f"{result['recall']:.4f}",
+            f"{result['f1_score']:.4f}",
+            roc_auc_str,
+            additional_info
+        )
+
+    console.print(results_table)
 
     # Evaluation method-based highest performance model
-    print("=" * 80)
-    print("Best Performance by Metric")
-    print("=" * 80)
+    console.print()
+    panel = Panel.fit(
+        "[bold white]Best Performance by Metric[/bold white]",
+        style="bold blue"
+    )
+    console.print(panel)
 
     metrics = [
         ('accuracy', 'ACCURACY'),
@@ -103,6 +139,12 @@ def print_evaluation_summary(all_results, preprocessing_info=None):
     if any(r['roc_auc'] is not None for r in all_results):
         metrics.append(('roc_auc', 'ROC-AUC'))
 
+    # Create table for best metrics
+    metrics_table = Table(show_header=True, header_style="bold magenta")
+    metrics_table.add_column("Metric", style="cyan")
+    metrics_table.add_column("Score", style="bold green", justify="right")
+    metrics_table.add_column("Model", style="yellow")
+
     for metric, display_name in metrics:
         if metric == 'roc_auc':
             valid_results = [r for r in all_results if r[metric] is not None]
@@ -112,31 +154,52 @@ def print_evaluation_summary(all_results, preprocessing_info=None):
         else:
             best = max(all_results, key=lambda x: x[metric])
 
-        print(f"{display_name}: {best[metric]:.4f} - {best['model_name']}")
+        metrics_table.add_row(
+            display_name,
+            f"{best[metric]:.4f}",
+            best['model_name']
+        )
+
+    console.print(metrics_table)
 
     # Print preprocessing information if provided
     if preprocessing_info:
-        print("\n" + "=" * 80)
-        print("Preprocessing Information")
-        print("=" * 80)
-        print(f"Scaler: {preprocessing_info.get('scaler', 'N/A')}")
-        print(f"Encoder: {preprocessing_info.get('encoder', 'N/A')}")
+        console.print()
+        panel = Panel.fit(
+            "[bold white]Preprocessing Information[/bold white]",
+            style="bold blue"
+        )
+        console.print(panel)
+
+        prep_table = Table(show_header=False, box=None)
+        prep_table.add_column("Property", style="cyan")
+        prep_table.add_column("Value", style="white")
+
+        prep_table.add_row("Scaler", preprocessing_info.get('scaler', 'N/A'))
+        prep_table.add_row("Encoder", preprocessing_info.get('encoder', 'N/A'))
         if 'train_shape' in preprocessing_info:
-            print(f"Train Data Shape: {preprocessing_info['train_shape']}")
+            prep_table.add_row("Train Data Shape", str(
+                preprocessing_info['train_shape']))
         if 'test_shape' in preprocessing_info:
-            print(f"Test Data Shape: {preprocessing_info['test_shape']}")
+            prep_table.add_row("Test Data Shape", str(
+                preprocessing_info['test_shape']))
         if 'features' in preprocessing_info:
-            print(f"Number of Features: {preprocessing_info['features']}")
-        print("=" * 80)
+            prep_table.add_row("Number of Features", str(
+                preprocessing_info['features']))
+
+        console.print(prep_table)
 
 
 def compare_preprocessing_results(preprocessing_results):
     """
     Compare results from different preprocessing techniques.
     """
-    print("\n" + "=" * 80)
-    print("PREPROCESSING TECHNIQUE COMPARISON")
-    print("=" * 80)
+    console.print()
+    panel = Panel.fit(
+        "[bold white]PREPROCESSING TECHNIQUE COMPARISON[/bold white]",
+        style="bold blue"
+    )
+    console.print(panel)
 
     # Group results by preprocessing technique
     grouped_results = {}
@@ -186,25 +249,45 @@ def compare_preprocessing_results(preprocessing_results):
     # Sort by best F1-score instead of average
     prep_performance.sort(key=lambda x: x['best_f1'], reverse=True)
 
-    print("Performance Ranking by Best F1-Score:")
-    print("-" * 80)
+    console.print(
+        "\n[bold yellow]Performance Ranking by Best F1-Score:[/bold yellow]")
+
+    # Create table for preprocessing performance
+    prep_table = Table(show_header=True, header_style="bold magenta")
+    prep_table.add_column("Rank", style="cyan", width=4)
+    prep_table.add_column("Scaler", style="yellow")
+    prep_table.add_column("Encoder", style="yellow")
+    prep_table.add_column("Best F1", style="bold green", justify="right")
+    prep_table.add_column("Best Model", style="white")
+    prep_table.add_column("Best Acc", style="green", justify="right")
+    prep_table.add_column("Best Prec", style="green", justify="right")
+    prep_table.add_column("Best Rec", style="green", justify="right")
+    prep_table.add_column("Best ROC", style="green", justify="right")
+    prep_table.add_column("Avg F1", style="dim", justify="right")
+    prep_table.add_column("Models", style="dim", justify="right")
+
     for i, prep in enumerate(prep_performance, 1):
-        print(
-            f"{i}. Scaler: {prep['scaler'].upper()}, Encoder: {prep['encoder'].upper()}")
-        print(
-            f"   Best F1-Score: {prep['best_f1']:.4f} ({prep['best_model']})")
-        print(f"   Best Accuracy: {prep['best_accuracy']:.4f}")
-        print(f"   Best Precision: {prep['best_precision']:.4f}")
-        print(f"   Best Recall: {prep['best_recall']:.4f}")
-        if prep['best_roc_auc'] is not None:
-            print(f"   Best ROC-AUC: {prep['best_roc_auc']:.4f}")
-        print(f"   Average F1-Score: {prep['avg_f1']:.4f}")
-        print(f"   Models Tested: {prep['num_models']}")
-        print()
+        roc_auc_str = f"{prep['best_roc_auc']:.4f}" if prep['best_roc_auc'] is not None else "N/A"
+
+        prep_table.add_row(
+            str(i),
+            prep['scaler'].upper(),
+            prep['encoder'].upper(),
+            f"{prep['best_f1']:.4f}",
+            prep['best_model'],
+            f"{prep['best_accuracy']:.4f}",
+            f"{prep['best_precision']:.4f}",
+            f"{prep['best_recall']:.4f}",
+            roc_auc_str,
+            f"{prep['avg_f1']:.4f}",
+            str(prep['num_models'])
+        )
+
+    console.print(prep_table)
 
     # Find best preprocessing technique for each metric
-    print("Best Preprocessing Technique by Metric:")
-    print("-" * 80)
+    console.print(
+        "\n[bold yellow]Best Preprocessing Technique by Metric:[/bold yellow]")
 
     metrics_to_check = [
         ('best_f1', 'Best F1-Score'),
@@ -221,6 +304,13 @@ def compare_preprocessing_results(preprocessing_results):
         metrics_to_check.append(('avg_roc_auc', 'Average ROC-AUC'))
         metrics_to_check.append(('best_roc_auc', 'Best ROC-AUC'))
 
+    # Create table for best preprocessing by metric
+    best_prep_table = Table(show_header=True, header_style="bold magenta")
+    best_prep_table.add_column("Metric", style="cyan")
+    best_prep_table.add_column("Score", style="bold green", justify="right")
+    best_prep_table.add_column("Scaler", style="yellow")
+    best_prep_table.add_column("Encoder", style="yellow")
+
     for metric_key, metric_name in metrics_to_check:
         if metric_key.startswith('avg_roc') or metric_key.startswith('best_roc'):
             valid_preps = [
@@ -231,9 +321,13 @@ def compare_preprocessing_results(preprocessing_results):
         else:
             best_prep = max(prep_performance, key=lambda x: x[metric_key])
 
-        print(f"{metric_name}: {best_prep[metric_key]:.4f} - "
-              f"Scaler: {best_prep['scaler'].upper()}, Encoder: {best_prep['encoder'].upper()}")
+        best_prep_table.add_row(
+            metric_name,
+            f"{best_prep[metric_key]:.4f}",
+            best_prep['scaler'].upper(),
+            best_prep['encoder'].upper()
+        )
 
-    print("=" * 80)
+    console.print(best_prep_table)
 
     return prep_performance
